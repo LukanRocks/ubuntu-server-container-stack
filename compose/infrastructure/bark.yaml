@@ -7,6 +7,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    environment:
+      - TZ=$TZ
     volumes:
       - $DOCKER_DATA_DIR/bark:/data
     networks:
@@ -19,9 +21,5 @@ services:
       retries: 3
     labels:
       - traefik.enable=true
-      - traefik.http.routers.bark-router.rule=Host(`bark.homeserver.lukan.rocks`)
-      - traefik.http.routers.bark-router.entrypoints=web,websecure
-      - traefik.http.routers.bark-router.tls=true
-      - traefik.http.routers.bark-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.bark-router.service=bark-services
-      - traefik.http.services.bark-services.loadbalancer.server.port=8080
+      - traefik.http.routers.bark.rule=Host(`bark.homeserver.lukan.rocks`)
+      - traefik.http.services.bark.loadbalancer.server.port=8080

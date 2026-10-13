@@ -24,7 +24,5 @@ services:
     # healthcheck: image ships its own (wget -O - http://localhost:7745/api/v1/status)
     labels:
       - traefik.enable=true
-      - traefik.http.routers.homebox-router.rule=Host(`homebox.homeserver.lukan.rocks`)
-      - traefik.http.routers.homebox-router.entrypoints=web,websecure
-      - traefik.http.routers.homebox-router.tls=true
-      - traefik.http.routers.homebox-router.tls.certresolver=letsencrypt
+      - traefik.http.routers.homebox.rule=Host(`homebox.homeserver.lukan.rocks`)
+      - traefik.http.services.homebox.loadbalancer.server.port=7745

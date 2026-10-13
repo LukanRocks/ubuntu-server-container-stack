@@ -10,7 +10,7 @@ services:
     privileged: true
     network_mode: host
     security_opt:
-      - apparmor:unconfined
+      - apparmor=unconfined # no no-new-privileges: needs SYS_ADMIN/DAC_READ_SEARCH below
     environment:
       - TZ=$TZ
     volumes:

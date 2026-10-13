@@ -3,7 +3,7 @@
 services:
   whisper:
     container_name: whisper
-    image: rhasspy/wyoming-whisper
+    image: rhasspy/wyoming-whisper:3.6.0
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -12,11 +12,10 @@ services:
     volumes:
       - $DOCKER_DATA_DIR/whisper:/data   # downloaded models
     networks:
-      traefik-proxy:
-        ipv4_address: 172.18.0.103 # fixed ip to be easily targeted | Maybe is unecessary, review later
-    # Only HA will directly access
-    # ports:
-    #   - 10300:10300
+      - traefik-proxy
+    ports:
+      # Loopback-only, aliased as `whisper` in homeassistant's extra_hosts.
+      - 127.0.0.1:10300:10300
     healthcheck: # Wyoming is TCP-only (no HTTP); python3 is the only tool in this image
       test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1',10300),timeout=5).close()"]
       interval: 30s

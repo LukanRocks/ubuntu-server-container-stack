@@ -3,7 +3,9 @@
 services:
   speech-to-phrase:
     container_name: speech-to-phrase
-    image: rhasspy/wyoming-speech-to-phrase
+    # Pinned by digest, not tag: the running image is `latest`, whose manifest
+    # doesn't match any published version tag (1.4.3 is a different build).
+    image: rhasspy/wyoming-speech-to-phrase@sha256:85580e14114b866f5ccd6ed856b0b97f634d8d0936ed7e31edc7822840327422
     restart: unless-stopped
     depends_on:
       homeassistant:
@@ -17,11 +19,12 @@ services:
       - $DOCKER_DATA_DIR/speech-to-phrase/train:/train     # generated training artifacts
       - $DOCKER_SECRETS_DIR/speech-to-phrase-command.sh:/run-secure.sh:ro # holds --hass-token, keeps it out of git
     networks:
-      traefik-proxy:
-        ipv4_address: 172.18.0.101 # fixed ip to be easily targeted | Maybe is unecessary, review later
-    # Only HA will directly access
-    # ports:
-    #   - 10300:10300
+      - traefik-proxy
+    ports:
+      # 127.0.0.2, not .1: whisper already holds 127.0.0.1:10300 and both images
+      # listen on 10300. A second loopback address keeps the port unchanged, so
+      # Home Assistant's `speech-to-phrase:10300` entry needs no edit.
+      - 127.0.0.2:10300:10300
     healthcheck: # Wyoming is TCP-only (no HTTP)
       test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1',10300),timeout=5).close()"]
       interval: 30s

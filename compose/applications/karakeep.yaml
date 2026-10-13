@@ -6,8 +6,10 @@ services:
     image: ghcr.io/karakeep-app/karakeep:0.32.0
     restart: unless-stopped
     depends_on:
-      - chrome
-      - meilisearch
+      chrome:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
     env_file: # Passwords and Secrets only file
@@ -24,16 +26,13 @@ services:
     volumes:
       - $DOCKER_DATA_DIR/karakeep:/data
     networks:
-      - traefik-proxy
+      - traefik-proxy      # front door, for Traefik
+      - karakeep-internal  # chrome + meilisearch
     # healthcheck: image ships its own (wget --spider http://127.0.0.1:3000/api/health)
     labels:
       - traefik.enable=true
-      - traefik.http.routers.karakeep-router.rule=Host(`karakeep.homeserver.lukan.rocks`)
-      - traefik.http.routers.karakeep-router.entrypoints=web,websecure
-      - traefik.http.routers.karakeep-router.tls=true
-      - traefik.http.routers.karakeep-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.karakeep-router.service=karakeep-services
-      - traefik.http.services.karakeep-services.loadbalancer.server.port=3000
+      - traefik.http.routers.karakeep.rule=Host(`karakeep.homeserver.lukan.rocks`)
+      - traefik.http.services.karakeep.loadbalancer.server.port=3000
 
   chrome:
     container_name: karakeep-chrome
@@ -42,7 +41,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - traefik-proxy
+      - karakeep-internal # renders untrusted pages, so keep it off traefik-proxy
     healthcheck: # 127.0.0.1, not localhost — chrome binds IPv4 only
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9222/json/version"]
       interval: 30s
@@ -70,10 +69,18 @@ services:
     volumes:
       - $DOCKER_DATA_DIR/meilisearch:/meili_data
     networks:
-      - traefik-proxy
+      - karakeep-internal # only karakeep talks to it
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
       interval: 30s
       timeout: 5s
       start_period: 15s
       retries: 3
+
+# Private to this stack, so it's declared here rather than in the root file.
+# Not `internal: true` — chrome has to reach the public internet to render
+# the pages being bookmarked.
+networks:
+  karakeep-internal:
+    name: karakeep-internal
+    driver: bridge

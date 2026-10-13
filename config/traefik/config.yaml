@@ -14,6 +14,10 @@ api: {}
 ping: {}
 
 entryPoints:
+  # Internal entrypoint serving ping and the API. Bound to loopback so it isn't
+  # reachable from the LAN — the dashboard is served through websecure instead.
+  traefik:
+    address: 127.0.0.1:8080
   web:
     address: :80
     http:
@@ -23,6 +27,10 @@ entryPoints:
           scheme: https
   websecure:
     address: :443
+    asDefault: true # routers that declare no entrypoints land here, and only here
+    http:
+      tls:
+        certResolver: letsencrypt # so services don't repeat tls/certresolver labels
 
 certificatesResolvers:
   letsencrypt:
@@ -39,8 +47,14 @@ providers:
   docker:
     # (Optional) Change this to true if you want to expose all services
     exposedByDefault: false
-  
+    # Pick the traefik-proxy IP for containers attached to several networks
+    network: traefik-proxy
+    # No defaultRule on purpose: its `.Name` is the provider's derived
+    # <compose-service>-<project> name, not the container name, so it generates
+    # hostnames like homebox-ubuntu-home-server. Each service labels its own
+    # Host rule, which also keeps hostnames greppable in the compose files.
+
   # watch for dynamic configuration changes
   file:
-    directory: /etc/traefik
+    directory: /etc/traefik/dynamic # must not be the dir holding this static config
     watch: true

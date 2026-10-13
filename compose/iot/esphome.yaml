@@ -3,22 +3,19 @@
 services:
   esphome:
     container_name: esphome
-    image: ghcr.io/esphome/esphome
+    image: ghcr.io/esphome/esphome:2026.8.1
     restart: unless-stopped
     privileged: true
     network_mode: host
     security_opt:
       - no-new-privileges:true
-    env_file: $DOCKER_SECRETS_DIR/esphome_secrets
+    env_file: # Password and Secrets only file
+      - $DOCKER_SECRETS_DIR/esphome_secrets
     volumes:
       - $DOCKER_DATA_DIR/esphome:/config:rw
-      - $DOCKER_LOCAL_DIR:ro
+      - $LOCALTIME_MOUNT:ro
     # healthcheck: image ships its own (curl --fail http://localhost:6052/version)
     labels:
       - traefik.enable=true
-      - traefik.http.routers.esphome-router.rule=Host(`esphome.homeserver.lukan.rocks`)
-      - traefik.http.routers.esphome-router.entrypoints=web,websecure
-      - traefik.http.routers.esphome-router.tls=true
-      - traefik.http.routers.esphome-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.esphome-router.service=esphome-services
-      - traefik.http.services.esphome-services.loadbalancer.server.port=6052
+      - traefik.http.routers.esphome.rule=Host(`esphome.homeserver.lukan.rocks`)
+      - traefik.http.services.esphome.loadbalancer.server.port=6052

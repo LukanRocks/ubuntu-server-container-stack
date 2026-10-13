@@ -10,16 +10,12 @@ services:
     environment:
       - TZ=$TZ
     volumes:
-      - $DOCKER_SOCK_DIR:rw
+      - $DOCKER_SOCK_MOUNT:rw
       - $DOCKER_DATA_DIR/portainer:/data:rw
     networks:
       - traefik-proxy
     # healthcheck: not possible — image is distroless (no shell, wget or curl); monitor externally via uptimekuma
     labels:
       - traefik.enable=true
-      - traefik.http.routers.portainer-router.rule=Host(`portainer.homeserver.lukan.rocks`)
-      - traefik.http.routers.portainer-router.entrypoints=web,websecure
-      - traefik.http.routers.portainer-router.tls=true
-      - traefik.http.routers.portainer-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.portainer-router.service=portainer-services
-      - traefik.http.services.portainer-services.loadbalancer.server.port=9000
+      - traefik.http.routers.portainer.rule=Host(`portainer.homeserver.lukan.rocks`)
+      - traefik.http.services.portainer.loadbalancer.server.port=9000

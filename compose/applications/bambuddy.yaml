@@ -1,3 +1,5 @@
+# Bambu Lab 3D printer manager - image: ghcr.io/maziggy/bambuddy
+
 services:
   bambuddy:
     container_name: bambuddy
@@ -16,9 +18,5 @@ services:
     # healthcheck: image ships its own (python urllib against http://localhost:8000/health)
     labels:
       - traefik.enable=true
-      - traefik.http.routers.bambuddy-router.rule=Host(`bambuddy.homeserver.lukan.rocks`)
-      - traefik.http.routers.bambuddy-router.entrypoints=web,websecure
-      - traefik.http.routers.bambuddy-router.tls=true
-      - traefik.http.routers.bambuddy-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.bambuddy-router.service=bambuddy-services
-      - traefik.http.services.bambuddy-services.loadbalancer.server.port=8000
+      - traefik.http.routers.bambuddy.rule=Host(`bambuddy.homeserver.lukan.rocks`)
+      - traefik.http.services.bambuddy.loadbalancer.server.port=8000

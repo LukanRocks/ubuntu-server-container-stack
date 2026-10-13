@@ -11,9 +11,11 @@ services:
     env_file: # Passwords and Secrets only file
       - $DOCKER_SECRETS_DIR/traefik_secrets
     volumes:
-      - $DOCKER_SOCK_DIR:ro
-      - $DOCKER_LOCAL_DIR:ro
+      - $DOCKER_SOCK_MOUNT:ro
+      - $LOCALTIME_MOUNT:ro
       - $DOCKER_CONFIG_DIR/traefik/config.yaml:/etc/traefik/traefik.yaml:ro
+      - $DOCKER_CONFIG_DIR/traefik/dynamic:/etc/traefik/dynamic:ro
+      - $DOCKER_SECRETS_DIR/traefik_users:/run/secrets/traefik_users:ro # bcrypt htpasswd for the dashboard
       - $DOCKER_DATA_DIR/letsencrypt:/letsencrypt:rw
       - $DOCKER_LOGS_DIR/traefik:/var/log/traefik:rw
     healthcheck: # requires `ping: {}` in config/traefik/config.yaml
@@ -22,11 +24,6 @@ services:
       timeout: 10s
       start_period: 15s
       retries: 3
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.traefik-router.rule=Host(`traefik.homeserver.lukan.rocks`)
-      - traefik.http.routers.traefik-router.entrypoints=web,websecure
-      - traefik.http.routers.traefik-router.tls=true
-      - traefik.http.routers.traefik-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.traefik-router.service=api@internal
-      - traefik.http.services.api@internal.loadbalancer.server.port=8080
+    # No traefik.* labels: the dashboard is routed from
+    # config/traefik/dynamic/traefik-dashboard.yaml instead. See the comment
+    # there for why labels don't work for Traefik's own internal service.

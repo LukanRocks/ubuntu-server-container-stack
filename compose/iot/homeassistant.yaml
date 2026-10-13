@@ -11,30 +11,29 @@ services:
       - matter-server
     privileged: true
     network_mode: host
+    # host-network means no Docker DNS, so these names resolve to the loopback
+    # addresses those containers publish on. Keeping the names stable means the
+    # Home Assistant integrations don't care where the containers actually live.
     extra_hosts:
-      - easy-mqtt:172.18.0.100
-      - speech-to-phrase:172.18.0.101
-      - piper:172.18.0.102
-      - whisper:172.18.0.103
+      - easy-mqtt:127.0.0.1
+      - piper:127.0.0.1
+      - whisper:127.0.0.1
+      - speech-to-phrase:127.0.0.2 # shares port 10300 with whisper
     security_opt:
       - no-new-privileges:true
     environment:
       - TZ=$TZ
     volumes:
       - $DOCKER_DATA_DIR/homeassistant:/config:rw
-      - $DOCKER_LOCAL_DIR:ro
-      - $DOCKER_SOCK_DIR:ro
+      - $LOCALTIME_MOUNT:ro
+      - $DOCKER_SOCK_MOUNT:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8123/manifest.json || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8123/manifest.json || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 90s
     labels:
       - traefik.enable=true
-      - traefik.http.routers.homeassistant-router.rule=Host(`ha.homeserver.lukan.rocks`)
-      - traefik.http.routers.homeassistant-router.entrypoints=web,websecure
-      - traefik.http.routers.homeassistant-router.tls=true
-      - traefik.http.routers.homeassistant-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.homeassistant-router.service=homeassistant-services
-      - traefik.http.services.homeassistant-services.loadbalancer.server.port=8123
+      - traefik.http.routers.homeassistant.rule=Host(`ha.homeserver.lukan.rocks`)
+      - traefik.http.services.homeassistant.loadbalancer.server.port=8123

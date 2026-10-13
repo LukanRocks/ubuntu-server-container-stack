@@ -4,12 +4,11 @@ networks:
   traefik-proxy:
     name: traefik-proxy
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
 
-# Include the individual docker compose files for each service
-# TODO: Create a script that auto generates the include paths
+# Include the individual docker compose files for each service.
+# The list stays hand-written on purpose: it carries the one-line descriptions
+# and lets a service be parked by commenting it out. `scripts/check-includes.sh`
+# verifies it against the files actually in compose/.
 include:
   # Applications
   - $APPLICATIONS_DIR/bambuddy.yaml # 3D printer manager

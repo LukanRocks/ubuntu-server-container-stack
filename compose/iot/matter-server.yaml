@@ -7,10 +7,11 @@ services:
     restart: unless-stopped
     network_mode: host
     security_opt:
-      - apparmor=unconfined
+      - no-new-privileges:true
+      - apparmor=unconfined # required: the Matter SDK needs to write to /sys for Bluetooth commissioning
     volumes:
       - $DOCKER_DATA_DIR/matter-server:/data:rw
-      - $DOCKER_SOCK_DIR:ro
+      - $DOCKER_SOCK_MOUNT:ro
     healthcheck: # image has curl, not wget
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5580/"]
       interval: 30s

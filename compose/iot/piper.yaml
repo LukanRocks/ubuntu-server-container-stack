@@ -3,7 +3,7 @@
 services:
   piper:
     container_name: piper
-    image: rhasspy/wyoming-piper
+    image: rhasspy/wyoming-piper:2.4.2
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -12,11 +12,12 @@ services:
     volumes:
       - $DOCKER_DATA_DIR/piper:/data   # downloaded voices
     networks:
-      traefik-proxy:
-        ipv4_address: 172.18.0.102 # fixed ip to be easily targeted | Maybe is unecessary, review later
-    # Only HA will directly access
-    # ports:
-    #   - 10200:10200
+      - traefik-proxy
+    ports:
+      # Only Home Assistant reaches this, and it runs host-network with no
+      # Docker DNS — so publish on loopback and let its extra_hosts alias
+      # `piper` to 127.0.0.1. Loopback-only, so nothing on the LAN can connect.
+      - 127.0.0.1:10200:10200
     healthcheck: # Wyoming is TCP-only (no HTTP); python3 is the only tool in this image
       test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1',10200),timeout=5).close()"]
       interval: 30s

@@ -8,14 +8,14 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      - TZ=$TZ
       - COOKIE_SECURE=true
     volumes:
       - $DOCKER_DATA_DIR/easy-mqtt:/data
     networks:
-      traefik-proxy:
-        ipv4_address: 172.18.0.100 # fixed ip to be easily targeted | Maybe is unecessary, review later
+      - traefik-proxy
     ports:
-      - 1883:1883
+      - 1883:1883 # LAN-wide: IoT devices and Home Assistant (host-network) connect here
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
       interval: 30s
@@ -24,9 +24,5 @@ services:
       retries: 3
     labels:
       - traefik.enable=true
-      - traefik.http.routers.easy-mqtt-router.rule=Host(`mqtt.homeserver.lukan.rocks`)
-      - traefik.http.routers.easy-mqtt-router.entrypoints=web,websecure
-      - traefik.http.routers.easy-mqtt-router.tls=true
-      - traefik.http.routers.easy-mqtt-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.easy-mqtt-router.service=easy-mqtt-services
-      - traefik.http.services.easy-mqtt-services.loadbalancer.server.port=80
+      - traefik.http.routers.easy-mqtt.rule=Host(`mqtt.homeserver.lukan.rocks`)
+      - traefik.http.services.easy-mqtt.loadbalancer.server.port=80

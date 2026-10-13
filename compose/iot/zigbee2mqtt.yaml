@@ -6,26 +6,25 @@ services:
     image: koenkk/zigbee2mqtt:2.12.1
     restart: unless-stopped
     depends_on:
-      - easy-mqtt
+      easy-mqtt:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    environment:
+      - TZ=$TZ
     volumes:
       - $DOCKER_DATA_DIR/zigbee2mqtt:/app/data:rw
-      - $DOCKER_LOCAL_DIR:ro
+      - $LOCALTIME_MOUNT:ro
       - $DOCKER_LOGS_DIR/zigbee2mqtt:/app/data/log:rw
     networks:
       - traefik-proxy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
       interval: 30s
       timeout: 5s
       start_period: 30s
       retries: 3
     labels:
       - traefik.enable=true
-      - traefik.http.routers.zigbee2mqtt-router.rule=Host(`z2m.homeserver.lukan.rocks`)
-      - traefik.http.routers.zigbee2mqtt-router.entrypoints=web,websecure
-      - traefik.http.routers.zigbee2mqtt-router.tls=true
-      - traefik.http.routers.zigbee2mqtt-router.tls.certresolver=letsencrypt
-      - traefik.http.routers.zigbee2mqtt-router.service=zigbee2mqtt-services
-      - traefik.http.services.zigbee2mqtt-services.loadbalancer.server.port=8080
+      - traefik.http.routers.zigbee2mqtt.rule=Host(`z2m.homeserver.lukan.rocks`)
+      - traefik.http.services.zigbee2mqtt.loadbalancer.server.port=8080

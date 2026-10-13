@@ -19,7 +19,5 @@ services:
       retries: 3
     labels:
       - traefik.enable=true
-      - traefik.http.routers.excalihome-router.rule=Host(`excalihome.homeserver.lukan.rocks`)
-      - traefik.http.routers.excalihome-router.entrypoints=web,websecure
-      - traefik.http.routers.excalihome-router.tls=true
-      - traefik.http.routers.excalihome-router.tls.certresolver=letsencrypt
+      - traefik.http.routers.excalihome.rule=Host(`excalihome.homeserver.lukan.rocks`)
+      - traefik.http.services.excalihome.loadbalancer.server.port=3000

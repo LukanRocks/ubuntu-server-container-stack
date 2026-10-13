@@ -1,0 +1,23 @@
+# Dynamic configuration, watched by the file provider.
+#
+# The dashboard is Traefik's own internal service (api@internal), not a
+# container the Docker provider can discover, so it is routed from here rather
+# than with labels on the traefik container. Labelling it would make the Docker
+# provider build a service for a host-network container with no exposed port,
+# which fails with "port is missing" and drops the whole container's config.
+#
+# Entrypoint, TLS and certresolver come from websecure in traefik.yaml.
+
+http:
+  routers:
+    traefik-dashboard:
+      rule: Host(`traefik.homeserver.lukan.rocks`)
+      service: api@internal
+      middlewares:
+        - dashboard-auth
+
+  middlewares:
+    # Basic auth, from a bcrypt htpasswd line in secrets/traefik_users.
+    dashboard-auth:
+      basicAuth:
+        usersFile: /run/secrets/traefik_users

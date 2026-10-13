@@ -19,7 +19,5 @@ services:
       retries: 3
     labels:
       - traefik.enable=true
-      - traefik.http.routers.tally-router.rule=Host(`tally.homeserver.lukan.rocks`)
-      - traefik.http.routers.tally-router.entrypoints=web,websecure
-      - traefik.http.routers.tally-router.tls=true
-      - traefik.http.routers.tally-router.tls.certresolver=letsencrypt
+      - traefik.http.routers.tally.rule=Host(`tally.homeserver.lukan.rocks`)
+      - traefik.http.services.tally.loadbalancer.server.port=3000

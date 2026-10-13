@@ -16,7 +16,5 @@ services:
     # healthcheck: image ships its own (extra/healthcheck, a compiled Go binary, start_period 180s)
     labels:
       - traefik.enable=true
-      - traefik.http.routers.uptimekuma-router.rule=Host(`uptimekuma.homeserver.lukan.rocks`)
-      - traefik.http.routers.uptimekuma-router.entrypoints=web,websecure
-      - traefik.http.routers.uptimekuma-router.tls=true
-      - traefik.http.routers.uptimekuma-router.tls.certresolver=letsencrypt
+      - traefik.http.routers.uptimekuma.rule=Host(`uptimekuma.homeserver.lukan.rocks`)
+      - traefik.http.services.uptimekuma.loadbalancer.server.port=3001
