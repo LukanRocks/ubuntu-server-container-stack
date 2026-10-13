@@ -19,6 +19,9 @@ include:
   - $APPLICATIONS_DIR/karakeep.yaml # Bookmark management tool
   - $APPLICATIONS_DIR/tally.yaml # Board games management tool
 
+  # Arr
+  - $ARR_DIR/jellyfin.yaml # Media server
+
   # Infrastructure
   - $INFRASTRUCTURE_DIR/bark.yaml # iOS notification server
   - $INFRASTRUCTURE_DIR/cups.yaml # Printer management and airport

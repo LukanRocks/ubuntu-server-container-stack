@@ -5,11 +5,12 @@ only declares shared resources (networks, the project name) and pulls in every
 service via `include:`. Each service lives in its own file, grouped by folder:
 
 - `compose/applications/` — user-facing apps
+- `compose/arr/` — media server and library automation
 - `compose/infrastructure/` — platform services
 - `compose/iot/` — home automation / IoT services
 
 If asked to create a new compose file and the target folder isn't specified or
-obvious from context, ask which of the three it belongs, or if a new folder needs to be created before creating it.
+obvious from context, ask which of these it belongs, or if a new folder needs to be created before creating it.
 
 ## Service file template
 
@@ -110,6 +111,25 @@ Home Assistant runs host-network and so has no Docker DNS. Services it must
 reach publish a port on `127.0.0.1` and get an `extra_hosts` alias pointing at
 `127.0.0.1`, which keeps the hostnames stable inside Home Assistant without
 pinning containers to static IPs.
+
+## NAS mounts
+
+The paths under `$DOCKER_MOUNTS_DIR` (`movies`, `shows`, `3d-printing`) are not
+local directories — they are SMB/CIFS shares from the TrueNAS box at
+`192.168.1.6`, automounted by systemd from `/etc/fstab` using the credentials in
+`secrets/truenas`.
+
+That means **`:ro`/`:rw` on the volume line cannot grant write access**. A bind
+mount only passes through what the host mount already allows, so a share mounted
+`ro` in `/etc/fstab` stays read-only inside the container no matter what compose
+says — the symptom is `Read-only file system` on write while `docker inspect`
+still reports `rw=true`. To change it, edit the `ro`/`rw` flag on that share's
+`/etc/fstab` line, `systemctl daemon-reload`, and remount (the containers holding
+the bind must stop first, or the unmount fails with `target is busy`).
+
+The shares mount with `uid=1000,forceuid,gid=1000,forcegid`, so files a container
+creates there belong to `lukanvanderlinde` regardless of the user inside the
+container — no `user:` or `group_add:` is needed to avoid root-owned files.
 
 ## Secrets
 
