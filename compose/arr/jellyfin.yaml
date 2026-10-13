@@ -1,4 +1,5 @@
 # Jellyfin is my media server - https://jellyfin.org/docs/general/installation/container
+# Shared with friends through a dedicated Tailscale node - https://tailscale.com/kb/1282/docker
 
 services:
   jellyfin:
@@ -32,3 +33,38 @@ services:
       - traefik.enable=true
       - traefik.http.routers.jellyfin.rule=Host(`jellyfin.homeserver.lukan.rocks`)
       - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+
+  jellyfin-tailscale:
+    container_name: jellyfin-tailscale
+    image: tailscale/tailscale:v1.102.5
+    restart: unless-stopped
+    depends_on:
+      - jellyfin
+    security_opt:
+      - no-new-privileges:true
+    env_file: # Passwords and Secrets only file
+      - $DOCKER_SECRETS_DIR/jellyfin-tailscale_secrets # TS_AUTHKEY=tskey-auth-... (tagged, e.g. tag:jellyfin)
+    environment: # General configurations
+      - TS_HOSTNAME=jellyfin # -> https://jellyfin.<tailnet>.ts.net
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true # no /dev/net/tun or NET_ADMIN needed; serve works in userspace
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_ENABLE_HEALTH_CHECK=true
+      - TS_LOCAL_ADDR_PORT=127.0.0.1:9002
+    volumes:
+      - $DOCKER_DATA_DIR/jellyfin-tailscale:/var/lib/tailscale:rw # node identity, keep it or the node re-registers
+      - $DOCKER_CONFIG_DIR/jellyfin-tailscale:/config:ro
+    networks:
+      - traefik-proxy # reaches jellyfin:8096 by Docker DNS
+    # No ports: single NAT (ISP router bridged), so NAT traversal gets direct
+    # connections. If `tailscale status` shows DERP while a friend streams, pin
+    # TS_TAILSCALED_EXTRA_ARGS=--port=41641 and publish/forward 41641/udp.
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9002/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    # No traefik.* labels: reached over the tailnet, not through Traefik.
+    # Share the node from the admin console (Machines > jellyfin > Share) so the
+    # friend sees only this node, not the rest of the tailnet.
