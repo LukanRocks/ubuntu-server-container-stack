@@ -22,7 +22,8 @@ services:
       - $DOCKER_MOUNTS_DIR/movies:/media/movies:rw
       - $DOCKER_MOUNTS_DIR/shows:/media/shows:rw
     networks:
-      - traefik-proxy
+      - traefik-proxy      # front door, for Traefik
+      - jellyfin-tailscale # tailnet sidecar
     # No ports: Traefik fronts the web UI. Client autodiscovery (7359/udp) needs
     # host networking to receive LAN broadcasts, so point clients at the URL.
     # healthcheck: image ships its own (curl $HEALTHCHECK_URL, http://localhost:8096/health)
@@ -55,7 +56,7 @@ services:
       - $DOCKER_DATA_DIR/jellyfin-tailscale:/var/lib/tailscale:rw # node identity, keep it or the node re-registers
       - $DOCKER_CONFIG_DIR/jellyfin-tailscale:/config:ro
     networks:
-      - traefik-proxy # reaches jellyfin:8096 by Docker DNS
+      - jellyfin-tailscale # faces outside users, so keep it off traefik-proxy
     # No ports: single NAT (ISP router bridged), so NAT traversal gets direct
     # connections. If `tailscale status` shows DERP while a friend streams, pin
     # TS_TAILSCALED_EXTRA_ARGS=--port=41641 and publish/forward 41641/udp.
@@ -68,3 +69,10 @@ services:
     # No traefik.* labels: reached over the tailnet, not through Traefik.
     # Share the node from the admin console (Machines > jellyfin > Share) so the
     # friend sees only this node, not the rest of the tailnet.
+
+# Private to this stack, so it's declared here rather than in the root file.
+# Not `internal: true` — tailscaled has to reach the coordination server and peers.
+networks:
+  jellyfin-tailscale:
+    name: jellyfin-tailscale
+    driver: bridge
