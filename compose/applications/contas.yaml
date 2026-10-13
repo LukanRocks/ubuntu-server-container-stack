@@ -1,0 +1,29 @@
+services:
+  contas:
+    container_name: contas
+    image: ghcr.io/lukanrocks/contas:latest
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - $DOCKER_DATA_DIR/contas:/app/data:rw
+    networks:
+      - traefik-proxy
+    # environment:
+      # Optional: shows the "Exemplo" button with this QR URL prefilled.
+      # A real note identifies a real person, so keep it in .env, not here.
+      # NFCE_SAMPLE_URL: ${NFCE_SAMPLE_URL:-}
+    healthcheck:
+      test: [ "CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.contas-router.rule=Host(`contas.homeserver.lukan.rocks`)
+      - traefik.http.routers.contas-router.entrypoints=web,websecure
+      - traefik.http.routers.contas-router.tls=true
+      - traefik.http.routers.contas-router.tls.certresolver=letsencrypt
+      - traefik.http.routers.contas-router.service=contas-services
+      - traefik.http.services.contas-services.loadbalancer.server.port=3000

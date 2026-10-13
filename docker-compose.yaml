@@ -13,11 +13,11 @@ networks:
 include:
   # Applications
   - $APPLICATIONS_DIR/bambuddy.yaml # 3D printer manager
+  - $APPLICATIONS_DIR/contas.yaml # Price tracking tool
   - $APPLICATIONS_DIR/excalihome.yaml # Local manage Excalidraw app
   - $APPLICATIONS_DIR/github-visualize.yaml # Dashboard that monitors your GitHub repositories
   - $APPLICATIONS_DIR/homebox.yaml # Asset organization tool
   - $APPLICATIONS_DIR/karakeep.yaml # Bookmark management tool
-  - $APPLICATIONS_DIR/nf-price-tracker.yaml # Price tracking tool
   - $APPLICATIONS_DIR/tally.yaml # Board games management tool
 
   # Infrastructure
