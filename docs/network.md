@@ -107,10 +107,11 @@ connections from people you trust.
 
 ### NAS access is not network access
 
-`mounts/torrents` and the other shares are CIFS mounts made by the **host** kernel against
-`192.168.1.6`. A tenant writing to `/downloads` sends no SMB packets through its own netns,
-so the tunnel is irrelevant to it and needs no outbound-subnet rule. qBittorrent (inside
-the tunnel) and Jellyfin (outside it) meet on the filesystem, not on the network.
+`mounts/library` is a CIFS mount made by the **host** kernel against `192.168.1.6`. A tenant
+writing to `/data/Torrents` sends no SMB packets through its own netns, so the tunnel is
+irrelevant to it and needs no outbound-subnet rule. qBittorrent (inside the tunnel) and
+Jellyfin (outside it) meet on the filesystem, not on the network — see
+[storage.md](storage.md) for the layout.
 
 ## Failure modes
 

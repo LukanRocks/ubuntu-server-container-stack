@@ -19,10 +19,10 @@ services:
       # (Dashboard > Libraries > the library > Save artwork into media folders).
       # :rw here is not enough on its own — these are NAS shares, so the `rw`
       # flag in /etc/fstab is what actually grants it.
-      - $DOCKER_MOUNTS_DIR/movies:/media/movies:rw
-      - $DOCKER_MOUNTS_DIR/shows:/media/shows:rw
-      - $DOCKER_MOUNTS_DIR/books:/media/books:rw
-      - $DOCKER_MOUNTS_DIR/courses:/media/courses:rw
+      - $DOCKER_LIBRARY_MOUNT_DIR/Movies:/media/movies:rw
+      - $DOCKER_LIBRARY_MOUNT_DIR/Shows:/media/shows:rw
+      - $DOCKER_LIBRARY_MOUNT_DIR/Books:/media/books:rw
+      - $DOCKER_LIBRARY_MOUNT_DIR/Courses:/media/courses:rw
     networks:
       - traefik-proxy      # front door, for Traefik
       - jellyfin-tailscale # tailnet sidecar
