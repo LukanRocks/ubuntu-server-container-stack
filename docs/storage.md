@@ -1,8 +1,8 @@
 # Storage layout
 
 Everything the media stack reads or writes lives on one SMB share from the TrueNAS box,
-mounted **once** at `mounts/library` (`$DOCKER_LIBRARY_MOUNT_DIR`). Containers bind
-subdirectories of that single mount.
+mounted **once** at `library/` in the repo root (`$DOCKER_LIBRARY_MOUNT_DIR`). Containers
+bind subdirectories of that single mount.
 
 ## Why one mount and not one per folder
 
@@ -12,11 +12,12 @@ same bytes. If the link can't be made they silently fall back to copying — two
 of every file on the NAS.
 
 Hardlinks cannot cross a mount point. This share used to be mounted as six separate CIFS
-mounts (one per folder), which the kernel treats as six devices:
+mounts, one per folder under a `mounts/` directory, which the kernel treats as six devices.
+Measured at the time, with each folder on its own mount:
 
 ```
-stat -c %d  ->  130 mounts/torrents   56 mounts/movies   52 mounts/shows
-ln mounts/torrents/.src mounts/movies/.lnk
+stat -c %d  ->  torrents 130    movies 56    shows 52
+ln <torrents>/.src <movies>/.lnk
   -> ln: failed to create hard link: Invalid cross-device link
 ```
 
@@ -37,7 +38,7 @@ One mount buys three things:
 ## Layout
 
 ```
-//192.168.1.6/Library  ->  mounts/library          ONE cifs mount, one device
+//192.168.1.6/Library  ->  library          ONE cifs mount, one device
 ├── Movies/        Jellyfin library  | Radarr root folder  /data/Movies
 ├── Shows/         Jellyfin library  | Sonarr root folder  /data/Shows
 ├── Books/         Jellyfin library
@@ -53,15 +54,15 @@ One mount buys three things:
 
 | Container | Host path | Container path |
 | --- | --- | --- |
-| qbittorrent | `mounts/library/Torrents` | `/data/Torrents` |
-| sonarr / radarr | `mounts/library` | `/data` |
-| jellyfin | `mounts/library/{Movies,Shows,Books,Courses}` | `/media/movies`, `/media/shows`, … |
-| bambuddy | `mounts/library/3DPrinting` | `/external/3d-printing` |
+| qbittorrent | `library/Torrents` | `/data/Torrents` |
+| sonarr / radarr | `library` | `/data` |
+| jellyfin | `library/{Movies,Shows,Books,Courses}` | `/media/movies`, `/media/shows`, … |
+| bambuddy | `library/3DPrinting` | `/external/3d-printing` |
 
 An arr app needs **both ends of the link** in one bind, so it mounts the whole share at
 `/data`. qBittorrent only ever writes inside `Torrents`, so it gets just that subdirectory —
 it cannot reach `Movies` or `Shows` at all. The paths still line up because
-`mounts/library/Torrents` is mounted at `/data/Torrents`, the same string an arr app sees.
+`library/Torrents` is mounted at `/data/Torrents`, the same string an arr app sees.
 
 Keep share folder names free of spaces. A space forces the whole volume mapping to be
 quoted (`- "$DOCKER_LIBRARY_MOUNT_DIR/Some Folder:/target"`) and had to be escaped octally
@@ -73,7 +74,7 @@ quoted (`- "$DOCKER_LIBRARY_MOUNT_DIR/Some Folder:/target"`) and had to be escap
 ## Adding a folder
 
 **No `/etc/fstab` change is needed.** Create the directory on the NAS (or just
-`mkdir mounts/library/<name>`, since the mount is writable) and bind it into a service:
+`mkdir library/<name>`, since the mount is writable) and bind it into a service:
 
 ```yaml
     volumes:
@@ -87,7 +88,7 @@ An fstab line is only needed to mount a *different* share.
 One line in `/etc/fstab`, automounted by systemd:
 
 ```
-//192.168.1.6/Library  /home/lukanvanderlinde/services/mounts/library  cifs  credentials=/home/lukanvanderlinde/services/secrets/truenas,uid=1000,gid=1000,file_mode=0644,dir_mode=0755,iocharset=utf8,vers=3.0,rw,_netdev,nofail,x-systemd.automount  0  0
+//192.168.1.6/Library  /home/lukanvanderlinde/services/library  cifs  credentials=/home/lukanvanderlinde/services/secrets/truenas,uid=1000,gid=1000,file_mode=0644,dir_mode=0755,iocharset=utf8,vers=3.0,rw,_netdev,nofail,x-systemd.automount  0  0
 ```
 
 `secrets/truenas` is read by `mount.cifs`, not by Docker — which is why it is named without
@@ -97,8 +98,8 @@ After editing that line:
 
 ```bash
 sudo systemctl daemon-reload                                        # generates the .mount/.automount units
-sudo systemctl start home-lukanvanderlinde-services-mounts-library.automount  # installs the autofs trigger
-ls mounts/library                                                   # first access performs the mount
+sudo systemctl start home-lukanvanderlinde-services-library.automount  # installs the autofs trigger
+ls library                                                   # first access performs the mount
 ```
 
 The `systemctl start` is easy to miss and not optional: `daemon-reload` only *generates* the
@@ -111,7 +112,7 @@ fstab generator writes the `.wants` symlink itself, so the mount returns after a
 **An empty directory inside the container, forever.** Mount before starting a container that
 binds it. Docker binds with `rprivate` propagation and `create_host_path: true`, so a
 container started while the path is unmounted captures the empty mount point and never sees
-the share even after the host mounts it. Confirm with `findmnt -T mounts/library` before
+the share even after the host mounts it. Confirm with `findmnt -T library` before
 `docker compose up`, and recreate (not restart) the container to fix it.
 
 **`Read-only file system` while `docker inspect` says `rw=true`.** `:ro`/`:rw` on a volume
