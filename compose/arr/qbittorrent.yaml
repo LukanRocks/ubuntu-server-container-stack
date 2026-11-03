@@ -1,0 +1,40 @@
+# qBittorrent is the download client for the arr stack - https://docs.linuxserver.io/images/docker-qbittorrent/
+# It has no network stack of its own: everything goes through gluetun, so the VPN
+# dropping takes its connectivity with it. See docs/network.md.
+#
+# Seeding: Surfshark has no port forwarding, so nothing can open a connection *to*
+# qBittorrent and it reports "Firewalled" permanently. Uploads still work to every peer
+# it dials out to, but it can't reach other unconnectable peers — fewer connections and
+# slower discovery. Turn UPnP/NAT-PMP and "use random port" off in the UI; they can't help.
+
+services:
+  qbittorrent:
+    container_name: qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:5.3.0_v2.1.2-ls486
+    restart: unless-stopped
+    depends_on:
+      gluetun: # declared in compose/infrastructure/gluetun.yaml, merged in by include:
+        condition: service_healthy # no tunnel, no traffic — wait for it
+    network_mode: service:gluetun # recreating gluetun orphans this netns: recreate this too
+    security_opt:
+      - no-new-privileges:true
+    environment: # General configurations
+      - TZ=$TZ
+      - PUID=1000 # matches uid=1000 on the CIFS mount, so downloads land as lukanvanderlinde
+      - PGID=1000
+      - WEBUI_PORT=8080 # must match FIREWALL_INPUT_PORTS in gluetun.yaml
+      - TORRENTING_PORT=6881 # the local listen port; unreachable from outside, see above
+    volumes:
+      - $DOCKER_DATA_DIR/qbittorrent:/config:rw
+      - $DOCKER_MOUNTS_DIR/torrents:/downloads:rw # NAS share; the rw flag in /etc/fstab is what actually grants writes
+    # No networks/ports: network_mode: service:gluetun owns both.
+    healthcheck: # lsio images ship curl but no HEALTHCHECK; this runs inside gluetun's netns
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    labels: # Traefik follows network_mode: service: back to gluetun for the IP
+      - traefik.enable=true
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.homeserver.lukan.rocks`)
+      - traefik.http.services.qbittorrent.loadbalancer.server.port=8080

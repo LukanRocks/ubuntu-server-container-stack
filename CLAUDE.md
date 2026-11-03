@@ -98,6 +98,12 @@ holding the static `config.yaml`.
 
 ## Networks
 
+[docs/network.md](docs/network.md) explains how the three layers that touch networking
+fit together — Traefik (inbound from the LAN), the Tailscale sidecar (inbound from the
+internet, Jellyfin only) and gluetun (outbound, for its tenants only) — and carries the
+checklist for putting another service behind the VPN. Read it before changing a service's
+`networks:` or `network_mode:`.
+
 Shared networks are declared in the root [docker-compose.yaml](docker-compose.yaml);
 a network private to one stack is declared in that stack's own service file
 (see [compose/applications/karakeep.yaml](compose/applications/karakeep.yaml)).
