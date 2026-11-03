@@ -10,6 +10,10 @@ services:
     depends_on:
       homeassistant:
         condition: service_healthy
+    extra_hosts:
+      # How secrets/speech-to-phrase-command.sh reaches host-network Home
+      # Assistant. Never hardcode a bridge gateway IP — see docs/network.md.
+      - host.docker.internal:host-gateway
     security_opt:
       - no-new-privileges:true
     environment:

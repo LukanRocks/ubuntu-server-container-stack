@@ -84,3 +84,8 @@ networks:
   karakeep-internal:
     name: karakeep-internal
     driver: bridge
+    # Pinned only so this network can't claim 172.18.0.0/16, which traefik-proxy
+    # needs for the Home Assistant firewall rule. See the root docker-compose.yaml.
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16

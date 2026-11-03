@@ -63,6 +63,45 @@ everything that didn't arrive over the VPN, except the ports listed in
 subnet gluetun auto-allows. Traefik's Docker provider resolves a `service:` container by
 inspecting the parent container, so the tenant keeps its own three Traefik labels.
 
+## Host firewall, and why the subnets are pinned
+
+`ufw` is active on the host and defaults to **deny incoming**, so a container cannot reach a
+host-network service unless a rule allows it. There is exactly one such rule:
+
+```
+8123/tcp   ALLOW IN   172.18.0.0/16        # Home Assistant, from traefik-proxy only
+```
+
+It matches on the **source** subnet, which makes the Docker subnet assignment load-bearing.
+That's why all three networks pin their range explicitly:
+
+| Network | Subnet | Declared in |
+| --- | --- | --- |
+| traefik-proxy | `172.18.0.0/16` | [../docker-compose.yaml](../docker-compose.yaml) |
+| karakeep-internal | `172.19.0.0/16` | [../compose/applications/karakeep.yaml](../compose/applications/karakeep.yaml) |
+| jellyfin-tailscale | `172.20.0.0/16` | [../compose/arr/jellyfin.yaml](../compose/arr/jellyfin.yaml) |
+
+Without the pins, `docker compose down` releases the subnets and the next `up` hands out
+whatever is free, in whatever order the networks happen to be created. **The symptom is
+nasty: every container starts and reports healthy, while anything that talks to Home
+Assistant times out.** `docker network inspect traefik-proxy` is what reveals it. This
+happened once — `traefik-proxy` came back as `172.19.0.0/16` and two services crash-looped
+for half an hour. Only `traefik-proxy`'s range actually matters, but the other two are
+pinned so they can't claim `172.18.0.0/16` first and make the pinned create fail with
+`Pool overlaps with other one on this address space`.
+
+A gluetun tenant has no address on `traefik-proxy`, so it cannot reach Home Assistant at
+all. That's intended.
+
+**Reaching Home Assistant from a container:** add
+`extra_hosts: - host.docker.internal:host-gateway` and use
+`http://host.docker.internal:8123`. Never hardcode a gateway IP — `speech-to-phrase` used
+to point at `172.18.0.1` and broke the moment the subnet moved.
+
+**The reverse direction** (Home Assistant → a container) doesn't touch any of this: HA runs
+host-network with no Docker DNS, so a service it needs publishes a port on `127.0.0.1` and
+gets an `extra_hosts` alias in `homeassistant.yaml` pointing there.
+
 ## Why Jellyfin stays outside the tunnel
 
 - A container cannot have both `network_mode: service:` and `networks:`. Tunneling Jellyfin
