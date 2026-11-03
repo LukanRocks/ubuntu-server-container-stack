@@ -114,10 +114,38 @@ pinning containers to static IPs.
 
 ## NAS mounts
 
-The paths under `$DOCKER_MOUNTS_DIR` (`movies`, `shows`, `3d-printing`) are not
-local directories — they are SMB/CIFS shares from the TrueNAS box at
-`192.168.1.6`, automounted by systemd from `/etc/fstab` using the credentials in
-`secrets/truenas`.
+The paths under `$DOCKER_MOUNTS_DIR` (`movies`, `shows`, `books`, `courses`,
+`3d-printing`) are not local directories — they are SMB/CIFS shares from the TrueNAS box, automounted by systemd from `/etc/fstab` using the credentials in
+`secrets/truenas`. That file is read by `mount.cifs`, not by Docker, which is why
+it's named `truenas` rather than `*_secrets` and holds no `KEY=VALUE` env lines.
+
+All of them are subpaths of one share — the SMB share is `Library`, and `Movies`,
+`Shows`, `Books`, `Courses` and `3D Printing` are directories inside it. To add
+another, create the mount point under `mounts/`, copy an existing `/etc/fstab`
+line verbatim and change only the share subpath and the mount point (escape
+spaces octally, as `3D\040Printing` does), then:
+
+```bash
+sudo systemctl daemon-reload                        # generates the .mount/.automount units
+sudo systemctl start home-...-mounts-<name>.automount  # installs the autofs trigger
+ls mounts/<name>                                    # first access performs the mount
+```
+
+The `systemctl start` is easy to miss and not optional: `daemon-reload` only
+*generates* the automount unit, so without starting it there is no autofs trigger
+and the `ls` silently mounts nothing — it just lists the empty mount point. No
+`systemctl enable` is needed, though; the fstab generator writes the `.wants`
+symlink itself, so the mount comes back on its own after a reboot.
+
+There's no `smbclient` on this host and the `Library` share root isn't mounted
+anywhere, so a new subpath can't be verified locally before mounting — check the
+TrueNAS UI, or let `mount` fail with `mount error(2): No such file or directory`.
+
+Mount before starting the container that binds it. Docker binds host paths with
+`rprivate` propagation, so a container started while the autofs path is unmounted
+captures the empty mount point and never sees the share, even once the host
+mounts it later — the fix is to recreate the container with the mount already
+active.
 
 That means **`:ro`/`:rw` on the volume line cannot grant write access**. A bind
 mount only passes through what the host mount already allows, so a share mounted

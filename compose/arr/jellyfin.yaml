@@ -21,6 +21,8 @@ services:
       # flag in /etc/fstab is what actually grants it.
       - $DOCKER_MOUNTS_DIR/movies:/media/movies:rw
       - $DOCKER_MOUNTS_DIR/shows:/media/shows:rw
+      - $DOCKER_MOUNTS_DIR/books:/media/books:rw
+      - $DOCKER_MOUNTS_DIR/courses:/media/courses:rw
     networks:
       - traefik-proxy      # front door, for Traefik
       - jellyfin-tailscale # tailnet sidecar
