@@ -10,6 +10,10 @@ services:
     depends_on:
       homeassistant:
         condition: service_healthy
+    extra_hosts:
+      # How secrets/speech-to-phrase-command.sh reaches host-network Home
+      # Assistant. Never hardcode a bridge gateway IP — see docs/network.md.
+      - host.docker.internal:host-gateway
     security_opt:
       - no-new-privileges:true
     environment:
@@ -17,7 +21,11 @@ services:
     volumes:
       - $DOCKER_DATA_DIR/speech-to-phrase/models:/models   # downloaded speech models (HuggingFace)
       - $DOCKER_DATA_DIR/speech-to-phrase/train:/train     # generated training artifacts
-      - $DOCKER_SECRETS_DIR/speech-to-phrase-command.sh:/run-secure.sh:ro # holds --hass-token, keeps it out of git
+      # The entrypoint script, kept in secrets/ because it carries --hass-token
+      # (Home Assistant > profile > Security > Long-lived access tokens). It also
+      # passes --hass-websocket-uri (ws://host.docker.internal:8123/api/websocket,
+      # via the extra_hosts alias above) and --retrain-on-start.
+      - $DOCKER_SECRETS_DIR/speech-to-phrase-command.sh:/run-secure.sh:ro
     networks:
       - traefik-proxy
     ports:

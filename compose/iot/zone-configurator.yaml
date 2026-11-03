@@ -7,13 +7,14 @@ services:
     image: everythingsmarthome/everything-presence-mmwave-configurator:2.2.4
     restart: unless-stopped
     depends_on:
-      - homeassistant
+      homeassistant:
+        condition: service_healthy # it opens the HA websocket at startup and exits if it can't
     extra_hosts:
       - host.docker.internal:host-gateway
     security_opt:
       - no-new-privileges:true
     env_file: # Password and Secrets only file
-      - $DOCKER_SECRETS_DIR/zone-configurator_secrets
+      - $DOCKER_SECRETS_DIR/zone-configurator_secrets # Provides HA_BASE_URL (http://host.docker.internal:8123, via the extra_hosts alias above — never a bridge gateway IP, see docs/network.md) and HA_LONG_LIVED_TOKEN (Home Assistant > profile > Security > Long-lived access tokens).
     environment:
       - TZ=$TZ
     volumes:

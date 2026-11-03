@@ -98,6 +98,12 @@ holding the static `config.yaml`.
 
 ## Networks
 
+[docs/network.md](docs/network.md) explains how the three layers that touch networking
+fit together — Traefik (inbound from the LAN), the Tailscale sidecar (inbound from the
+internet, Jellyfin only) and gluetun (outbound, for its tenants only) — and carries the
+checklist for putting another service behind the VPN. Read it before changing a service's
+`networks:` or `network_mode:`.
+
 Shared networks are declared in the root [docker-compose.yaml](docker-compose.yaml);
 a network private to one stack is declared in that stack's own service file
 (see [compose/applications/karakeep.yaml](compose/applications/karakeep.yaml)).
@@ -114,50 +120,32 @@ pinning containers to static IPs.
 
 ## NAS mounts
 
-The paths under `$DOCKER_MOUNTS_DIR` (`movies`, `shows`, `books`, `courses`,
-`3d-printing`) are not local directories — they are SMB/CIFS shares from the TrueNAS box, automounted by systemd from `/etc/fstab` using the credentials in
-`secrets/truenas`. That file is read by `mount.cifs`, not by Docker, which is why
-it's named `truenas` rather than `*_secrets` and holds no `KEY=VALUE` env lines.
+[docs/storage.md](docs/storage.md) holds the folder layout, which container mounts
+what, why it is a single mount (hardlinks), how to add a folder, and the gotchas
+by symptom. Read it before changing a `volumes:` line that touches
+`$DOCKER_LIBRARY_MOUNT_DIR`.
 
-All of them are subpaths of one share — the SMB share is `Library`, and `Movies`,
-`Shows`, `Books`, `Courses` and `3D Printing` are directories inside it. To add
-another, create the mount point under `mounts/`, copy an existing `/etc/fstab`
-line verbatim and change only the share subpath and the mount point (escape
-spaces octally, as `3D\040Printing` does), then:
+`$DOCKER_LIBRARY_MOUNT_DIR` is not a local directory — it is the TrueNAS
+`Library` SMB/CIFS share, mounted **once** and automounted by systemd from
+`/etc/fstab` using the credentials in `secrets/truenas`. That file is read by
+`mount.cifs`, not by Docker, which is why it's named `truenas` rather than
+`*_secrets` and holds no `KEY=VALUE` env lines. Containers bind subdirectories of
+that one mount (`$DOCKER_LIBRARY_MOUNT_DIR/Movies`, `.../Torrents`, …), which is
+what keeps hardlinks and atomic moves working — adding a folder needs no
+`/etc/fstab` change at all.
 
-```bash
-sudo systemctl daemon-reload                        # generates the .mount/.automount units
-sudo systemctl start home-...-mounts-<name>.automount  # installs the autofs trigger
-ls mounts/<name>                                    # first access performs the mount
-```
+Three rules that bite otherwise:
 
-The `systemctl start` is easy to miss and not optional: `daemon-reload` only
-*generates* the automount unit, so without starting it there is no autofs trigger
-and the `ls` silently mounts nothing — it just lists the empty mount point. No
-`systemctl enable` is needed, though; the fstab generator writes the `.wants`
-symlink itself, so the mount comes back on its own after a reboot.
-
-There's no `smbclient` on this host and the `Library` share root isn't mounted
-anywhere, so a new subpath can't be verified locally before mounting — check the
-TrueNAS UI, or let `mount` fail with `mount error(2): No such file or directory`.
-
-Mount before starting the container that binds it. Docker binds host paths with
-`rprivate` propagation, so a container started while the autofs path is unmounted
-captures the empty mount point and never sees the share, even once the host
-mounts it later — the fix is to recreate the container with the mount already
-active.
-
-That means **`:ro`/`:rw` on the volume line cannot grant write access**. A bind
-mount only passes through what the host mount already allows, so a share mounted
-`ro` in `/etc/fstab` stays read-only inside the container no matter what compose
-says — the symptom is `Read-only file system` on write while `docker inspect`
-still reports `rw=true`. To change it, edit the `ro`/`rw` flag on that share's
-`/etc/fstab` line, `systemctl daemon-reload`, and remount (the containers holding
-the bind must stop first, or the unmount fails with `target is busy`).
-
-The shares mount with `uid=1000,forceuid,gid=1000,forcegid`, so files a container
-creates there belong to `lukanvanderlinde` regardless of the user inside the
-container — no `user:` or `group_add:` is needed to avoid root-owned files.
+- **Mount before starting a container that binds it.** Docker binds with
+  `rprivate` propagation and creates missing host paths, so a container started
+  while the mount is inactive captures an empty directory and never sees the
+  share. The fix is to recreate it with the mount already active.
+- **`:ro`/`:rw` on the volume line cannot grant access.** A bind only passes
+  through what the host mount allows; the flag in `/etc/fstab` decides. The
+  symptom is `Read-only file system` while `docker inspect` reports `rw=true`.
+- The share mounts with `uid=1000,forceuid,gid=1000,forcegid`, so files a
+  container creates belong to `lukanvanderlinde` whatever user runs inside it —
+  no `user:` or `group_add:` needed.
 
 ## Secrets
 

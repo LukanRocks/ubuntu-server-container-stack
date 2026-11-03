@@ -14,7 +14,7 @@ services:
     volumes:
       - $DOCKER_DATA_DIR/bambuddy:/app/data
       - $DOCKER_LOGS_DIR/bambuddy:/app/logs
-      - $DOCKER_MOUNTS_DIR/3d-printing:/external/3d-printing
+      - $DOCKER_LIBRARY_MOUNT_DIR/3DPrinting:/external/3d-printing
     # healthcheck: image ships its own (python urllib against http://localhost:8000/health)
     labels:
       - traefik.enable=true

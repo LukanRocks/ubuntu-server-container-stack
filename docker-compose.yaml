@@ -4,6 +4,16 @@ networks:
   traefik-proxy:
     name: traefik-proxy
     driver: bridge
+    # Pinned, and load-bearing. Containers reach host-network Home Assistant on
+    # this network's gateway, and the host firewall only permits that from here:
+    # `ufw allow 8123/tcp from 172.18.0.0/16`. Without the pin, `docker compose
+    # down` releases the subnet and the next `up` hands out whatever is free —
+    # containers then come up healthy and silently cannot reach Home Assistant.
+    # See docs/network.md. The other two networks are pinned so they can't claim
+    # this range first.
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
 
 # Include the individual docker compose files for each service.
 # The list stays hand-written on purpose: it carries the one-line descriptions
@@ -21,10 +31,12 @@ include:
 
   # Arr
   - $ARR_DIR/jellyfin.yaml # Media server
+  - $ARR_DIR/qbittorrent.yaml # Torrent client, routed through gluetun
 
   # Infrastructure
   - $INFRASTRUCTURE_DIR/bark.yaml # iOS notification server
   - $INFRASTRUCTURE_DIR/cups.yaml # Printer management and airport
+  - $INFRASTRUCTURE_DIR/gluetun.yaml # VPN tunnel shared by other containers
   - $INFRASTRUCTURE_DIR/portainer.yaml # Docker management UI
   - $INFRASTRUCTURE_DIR/traefik.yaml # Domain routing, reverse proxy and certificate manager
   - $INFRASTRUCTURE_DIR/uptimekuma.yaml # Uptime monitoring

@@ -1,0 +1,43 @@
+# Gluetun holds a VPN tunnel that other containers share a network stack with.
+# Surfshark over WireGuard - https://github.com/passteque/gluetun
+# Which services belong behind it, and why Jellyfin doesn't: docs/network.md
+
+services:
+  gluetun:
+    container_name: gluetun
+    image: qmcgaw/gluetun:v3.41.3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true # fine next to cap_add: capabilities are granted at start
+    env_file: # Password and Secrets only file
+      - $DOCKER_SECRETS_DIR/gluetun_secrets # Provides WIREGUARD_PRIVATE_KEY. Surfshark > VPN > Manual setup > WireGuard > "I don't have a keypair" generates it. Keep it stable — a new key means a new WIREGUARD_ADDRESSES below.
+    environment: # General configurations
+      - TZ=$TZ
+      - VPN_SERVICE_PROVIDER=surfshark
+      - VPN_TYPE=wireguard
+      - WIREGUARD_ADDRESSES=10.14.0.2/16 # the Address line of the generated Surfshark config; identical on every Surfshark server, so not a secret
+      - SERVER_COUNTRIES=United States,Argentina,Chile # gluetun picks among Surfshark's servers in these
+      # Opens the bridge side of the tunnel so Traefik can reach a tenant's web UI.
+      # Without it the kill-switch firewall drops anything not arriving over the VPN.
+      # One port per tenant — add to this list as services move behind gluetun.
+      - FIREWALL_INPUT_PORTS=8080 # qbittorrent, see compose/arr/qbittorrent.yaml
+      - DOT=on # DNS over TLS, so tenant lookups don't leak to the ISP resolver
+      - UPDATER_PERIOD=24h # keep the bundled Surfshark server list fresh
+    volumes:
+      - $DOCKER_DATA_DIR/gluetun:/gluetun:rw
+    networks:
+      - traefik-proxy
+    # No ports: Traefik reaches each tenant on this container's traefik-proxy IP — its
+    # Docker provider follows network_mode: service: back to this parent container.
+    # gluetun auto-allows its own 172.18.0.0/16, which covers Traefik's host-netns source
+    # address (172.18.0.1). Reaching a tenant from the LAN directly, or a tenant reaching
+    # a LAN host over the network, would need FIREWALL_OUTBOUND_SUBNETS.
+    # healthcheck: image ships its own (gluetun-entrypoint healthcheck, pings through the tunnel)
+    # No traefik.* labels: gluetun has no web UI, and its control server (:8000) requires
+    # an auth file at /gluetun/auth/config.toml since v3.39.1, so it stays internal.
+    # No VPN_PORT_FORWARDING: Surfshark doesn't offer it. Tenants are unconnectable from
+    # the internet — see the Seeding note in compose/arr/qbittorrent.yaml.
+    cap_add:
+      - NET_ADMIN # required: creates the wireguard interface and the kill-switch firewall
+    devices:
+      - /dev/net/tun:/dev/net/tun # required: the tunnel device
