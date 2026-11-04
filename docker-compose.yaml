@@ -30,8 +30,12 @@ include:
   - $APPLICATIONS_DIR/tally.yaml # Board games management tool
 
   # Arr
+  - $ARR_DIR/flaresolverr.yaml # Cloudflare challenge solver for Prowlarr, routed through gluetun
   - $ARR_DIR/jellyfin.yaml # Media server
+  - $ARR_DIR/prowlarr.yaml # Indexer manager for the arr apps, routed through gluetun
   - $ARR_DIR/qbittorrent.yaml # Torrent client, routed through gluetun
+  - $ARR_DIR/radarr.yaml # Movie library automation, routed through gluetun
+  - $ARR_DIR/sonarr.yaml # TV library automation, routed through gluetun
 
   # Infrastructure
   - $INFRASTRUCTURE_DIR/bark.yaml # iOS notification server

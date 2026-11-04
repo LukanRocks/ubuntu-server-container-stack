@@ -29,8 +29,13 @@ traffic and each container has exactly one network stack.
                 |
                 +--> gluetun  172.18.0.x  <-- inbound only on FIREWALL_INPUT_PORTS
                        |  tun0 -> Surfshark  --> ALL tenant egress leaves here
-                       |  (shares its netns)
-                       +--> qbittorrent  (no networks:, no ports: of its own)
+                       |  (shares its netns; tenants declare no networks:, no ports:)
+                       +--> qbittorrent  :8080 ---+
+                       +--> radarr       :7878    |  they reach each other
+                       +--> sonarr       :8989    |  at 127.0.0.1:<port>
+                       +--> prowlarr     :9696    |
+                       +--> flaresolverr :8191 ---+  (no Traefik route: only Prowlarr
+                                                      calls it, over loopback)
 ```
 
 ## Invariants
@@ -56,12 +61,20 @@ the node from the Tailscale admin console. It is ingress only and does not touch
 outbound traffic.
 
 **gluetun.** Tenants declare `network_mode: service:gluetun` and therefore have no
-interface of their own — their only route out is `tun0`. gluetun's firewall drops
-everything that didn't arrive over the VPN, except the ports listed in
-`FIREWALL_INPUT_PORTS`. Traefik (host netns) connects to the tenant's UI at gluetun's
-`traefik-proxy` address with source `172.18.0.1`, which is inside the `172.18.0.0/16`
-subnet gluetun auto-allows. Traefik's Docker provider resolves a `service:` container by
-inspecting the parent container, so the tenant keeps its own three Traefik labels.
+interface of their own — their only route out is `tun0`. The kill-switch firewall drops
+inbound traffic that arrived over neither the VPN nor the local bridge. Traefik (host netns)
+connects to the tenant's UI at gluetun's `traefik-proxy` address with source `172.18.0.1`,
+which is inside the `172.18.0.0/16` subnet gluetun auto-allows. Traefik's Docker provider
+resolves a `service:` container by inspecting the parent container, so the tenant keeps its
+own three Traefik labels.
+
+That auto-allow is broader than it looks, and it is worth knowing before relying on
+`FIREWALL_INPUT_PORTS` for anything: gluetun inserts `ACCEPT -i eth0 -d 172.18.0.0/16`
+*above* the per-port rules, so **every tenant port is reachable from anything on
+`traefik-proxy`, listed or not.** `docker exec gluetun iptables -L INPUT -n -v` makes it
+plain — the subnet rule accumulates packets while each port rule stays at `0`. So the list
+is documentation of which tenants Traefik fronts, not an access control; leaving a port out
+hides nothing. What the tunnel actually protects is **egress**, which is the point of it.
 
 ## Host firewall, and why the subnets are pinned
 
@@ -127,20 +140,27 @@ connections from people you trust.
 2. Add `depends_on: {gluetun: {condition: service_healthy}}`.
 3. Give it a port no other tenant uses — they share one netns, so ports collide.
 4. Append that port to `FIREWALL_INPUT_PORTS` in
-   [compose/infrastructure/gluetun.yaml](../compose/infrastructure/gluetun.yaml).
-5. Keep the three Traefik labels on the service itself.
+   [compose/infrastructure/gluetun.yaml](../compose/infrastructure/gluetun.yaml) if Traefik
+   fronts it, so the list keeps describing the stack. It is not what admits the traffic —
+   see the auto-allow note above — so a tenant only other tenants call (`flaresolverr`) can
+   be left out without consequence either way.
+5. Keep the three Traefik labels on the service itself — unless it has no web interface, in
+   which case give it none at all and say why in a comment (`exposedByDefault: false`, so
+   Traefik ignores an unlabelled container).
 6. Recreate **every** tenant whenever gluetun is recreated — a netns belongs to a
-   container ID, and tenants of the old one are left with no network:
-   `docker compose up -d --force-recreate <tenants>`.
+   container ID, and tenants of the old one are left with no network. All five, every time:
+   `docker compose up -d --force-recreate qbittorrent radarr sonarr prowlarr flaresolverr`.
+   Miss one and it keeps running, and keeps reporting as running, with a dead netns.
 
 ### Addressing between services
 
 - Tenant → tenant: `http://127.0.0.1:<port>`. They share a netns, so no DNS is involved.
 - Non-tenant → tenant: `http://gluetun:<port>` on `traefik-proxy`. The address is
   gluetun's, not the tenant's.
-- Tenant → non-tenant: tenants have no Docker DNS, so they cannot resolve `sonarr` or
-  `radarr` by name. A tenant that must call out to a container on `traefik-proxy` needs
+- Tenant → non-tenant: tenants have no Docker DNS, so they cannot resolve `homebox` or
+  `jellyfin` by name. A tenant that must call out to a container on `traefik-proxy` needs
   `FIREWALL_OUTBOUND_SUBNETS=172.18.0.0/16` on gluetun and an IP or an `extra_hosts` alias.
+  Nothing needs this today — the whole arr stack is tenants, so every hop is loopback.
 - Reaching a tenant straight from a LAN machine (bypassing Traefik) needs
   `FIREWALL_OUTBOUND_SUBNETS=192.168.1.0/24`.
 

@@ -1,0 +1,42 @@
+# Radarr automates the movie library - https://docs.linuxserver.io/images/docker-radarr/
+# It has no network stack of its own: everything goes through gluetun, so it reaches
+# qBittorrent, Sonarr and Prowlarr on 127.0.0.1. See docs/network.md.
+
+services:
+  radarr:
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls325
+    restart: unless-stopped
+    depends_on:
+      gluetun: # declared in compose/infrastructure/gluetun.yaml, merged in by include:
+        condition: service_healthy # no tunnel, no traffic — wait for it
+    network_mode: service:gluetun # recreating gluetun orphans this netns: recreate this too
+    security_opt:
+      - no-new-privileges:true
+    # No env_file: Radarr generates its own API key into /config/config.xml on first start.
+    environment: # General configurations
+      - TZ=$TZ
+      - PUID=1000 # matches uid=1000 on the CIFS mount, so imports land as lukanvanderlinde
+      - PGID=1000
+    volumes:
+      - $DOCKER_DATA_DIR/radarr:/config:rw
+      # The WHOLE share in one bind, not just Movies. Importing hardlinks the download out of
+      # /data/Torrents into /data/Movies, and hardlinks cannot cross a mount point — split
+      # this up and Radarr silently copies instead. Root folder is /data/Movies.
+      # Nothing is created on the NAS by this: /data is the container-side name for the share,
+      # whose layout stays library/{Movies,Shows,Torrents,...}. See docs/storage.md.
+      - $DOCKER_LIBRARY_MOUNT_DIR:/data:rw
+    # No networks/ports: network_mode: service:gluetun owns both.
+    healthcheck: # lsio images ship curl but no HEALTHCHECK; this runs inside gluetun's netns
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:7878/ping"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    labels: # Traefik follows network_mode: service: back to gluetun for the IP
+      - traefik.enable=true
+      - traefik.http.routers.radarr.rule=Host(`radarr.homeserver.lukan.rocks`)
+      - traefik.http.services.radarr.loadbalancer.server.port=7878
+    # Never configure a remote path mapping. qBittorrent reports a download at
+    # /data/Torrents/movies/... and that exact string resolves here, because both containers
+    # bind the same single CIFS mount — a mapping can only break it.

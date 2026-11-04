@@ -23,6 +23,7 @@ services:
       - $DOCKER_LIBRARY_MOUNT_DIR/Shows:/media/shows:rw
       - $DOCKER_LIBRARY_MOUNT_DIR/Books:/media/books:rw
       - $DOCKER_LIBRARY_MOUNT_DIR/Courses:/media/courses:rw
+      - $DOCKER_LIBRARY_MOUNT_DIR/Offloads:/media/offloads:rw
     networks:
       - traefik-proxy      # front door, for Traefik
       - jellyfin-tailscale # tailnet sidecar

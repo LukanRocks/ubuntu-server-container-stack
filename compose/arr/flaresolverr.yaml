@@ -1,0 +1,34 @@
+# FlareSolverr solves the Cloudflare challenges that block Prowlarr's indexers.
+# https://github.com/FlareSolverr/FlareSolverr
+# A gluetun tenant, and necessarily so: FlareSolverr is what actually fetches the tracker
+# page, so its egress must leave by the same exit as Prowlarr's. Outside the tunnel it would
+# solve the challenge from the house IP while Prowlarr's follow-up requests arrive from the
+# VPN IP, the clearance cookie is bound to the solving IP, so it would be rejected, and the
+# house address would be handed to the tracker on every solve. See docs/network.md.
+
+services:
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.2
+    restart: unless-stopped
+    depends_on:
+      gluetun: # declared in compose/infrastructure/gluetun.yaml, merged in by include:
+        condition: service_healthy # no gluetun tunnel, no traffic.
+    network_mode: service:gluetun # recreating gluetun orphans this netns: recreate this too
+    # No networks/ports: network_mode: service:gluetun owns both.
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - LOG_LEVEL=info # debug also logs every solved challenge, which is noisy
+      - LOG_HTML=false # true dumps whole pages into the logs
+      - CAPTCHA_SOLVER=none # no third-party solver service wired up
+    # No volumes: FlareSolverr keeps nothing across restarts
+    healthcheck: # image ships no HEALTHCHECK, but does ship curl; this runs inside gluetun's netns
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8191/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s # first start downloads and warms up a Chrome profile
+      retries: 3
+    # No traefik.* labels: FlareSolverr is a JSON API with no web interface, and its only caller is Prowlarr.
+    # See the note on compose/infrastructure/gluetun.yaml.
